@@ -8,11 +8,15 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import org.w3c.dom.Text;
 
+import java.text.DateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -28,7 +32,7 @@ public class CrimeListFragment extends Fragment {
 
         View view = inflater.inflate(R.layout.fragment_crime_list, container, false);
 
-        mCrimeRecyclerView = (RecyclerView) view.findViewById(R.id.crime_recycler_view);
+        mCrimeRecyclerView = view.findViewById(R.id.crime_recycler_view);
 
         mCrimeRecyclerView.setLayoutManager(new LinearLayoutManager((getActivity())));
 
@@ -49,14 +53,15 @@ public class CrimeListFragment extends Fragment {
 
         private TextView mTitleTextView;
         private TextView mDateTextView;
-        private Button mCallPoliceButton;
+        private ImageView mSolvedImageView;
 
-        public CrimeHolder(LayoutInflater inflater, ViewGroup parent, int view) {
-            super(inflater.inflate(view, parent, false));
+        public CrimeHolder(LayoutInflater inflater, ViewGroup parent, int viewType) {
+            super(inflater.inflate(viewType, parent, false));
             itemView.setOnClickListener(this);
 
-            mTitleTextView = (TextView) itemView.findViewById(R.id.crime_title);
-            mDateTextView = (TextView) itemView.findViewById(R.id.crime_date);
+            mTitleTextView = itemView.findViewById(R.id.crime_title);
+            mDateTextView = itemView.findViewById(R.id.crime_date);
+            mSolvedImageView = itemView.findViewById(R.id.crime_solved);
         }
 
         public void onClick(View view) {
@@ -67,19 +72,10 @@ public class CrimeListFragment extends Fragment {
 
         public void bind(Crime crime) {
             mCrime = crime;
-            mTitleTextView.setText(mCrime.getTitle());
-            mDateTextView.setText(mCrime.getDate().toString());
-
-            if (mCrime.isRequiresPolice()) {
-                mCallPoliceButton = (Button) itemView.findViewById(R.id.call_police_button);
-                mCallPoliceButton.setOnClickListener(new View.OnClickListener() {
-                    public void onClick(View view) {
-                        Toast.makeText(getActivity(), "Police Contacted", Toast.LENGTH_SHORT).show();
-                    }
-                });
+            android.text.format.DateFormat df = new android.text.format.DateFormat();
+            mDateTextView.setText(df.format("EEEE, MMM dd, yyyy", mCrime.getDate()));
             }
         }
-    }
 
 
     private class CrimeAdapter extends RecyclerView.Adapter<CrimeHolder> {
@@ -97,14 +93,16 @@ public class CrimeListFragment extends Fragment {
             return new CrimeHolder(layoutInflater, parent, viewType);
         }
 
+        @Override
         public int getItemViewType(int position) {
-            if (mCrimes.get(position).isRequiresPolice()) {
-                return R.layout.list_item_crime_arrest;
+            if (mCrimes.get(position).isSolved()) {
+                return R.layout.list_item_crime_no_image;
             }
             else {
                 return R.layout.list_item_crime;
             }
         }
+
         @Override
         public void onBindViewHolder(CrimeHolder holder, int position) {
             Crime crime = mCrimes.get(position);
