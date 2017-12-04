@@ -1,9 +1,11 @@
 package com.bignerdranch.android.criminalintent;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,6 +29,7 @@ public class CrimeListFragment extends Fragment {
 
     private RecyclerView mCrimeRecyclerView;
     private CrimeAdapter mAdapter;
+    private int itemPosition;
 
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
@@ -41,19 +44,29 @@ public class CrimeListFragment extends Fragment {
         return view;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        updateUI();
+    }
+
     private void updateUI() {
         CrimeLab crimeLab = CrimeLab.get(getActivity());
         List<Crime> crimes = crimeLab.getCrimes();
 
-        mAdapter = new CrimeAdapter(crimes);
-        mCrimeRecyclerView.setAdapter(mAdapter);
+        if (mAdapter == null) {
+            mAdapter = new CrimeAdapter(crimes);
+            mCrimeRecyclerView.setAdapter(mAdapter);
+        }
+        else {
+            mAdapter.notifyItemChanged(itemPosition);
+        }
     }
 
     private class CrimeHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
 
         private TextView mTitleTextView;
         private TextView mDateTextView;
-        private ImageView mSolvedImageView;
 
         public CrimeHolder(LayoutInflater inflater, ViewGroup parent, int viewType) {
             super(inflater.inflate(viewType, parent, false));
@@ -61,11 +74,12 @@ public class CrimeListFragment extends Fragment {
 
             mTitleTextView = itemView.findViewById(R.id.crime_title);
             mDateTextView = itemView.findViewById(R.id.crime_date);
-            mSolvedImageView = itemView.findViewById(R.id.crime_solved);
         }
 
         public void onClick(View view) {
-            Toast.makeText(getActivity(), mCrime.getTitle() + " Clicked", Toast.LENGTH_SHORT).show();
+            Intent intent = CrimePagerActivity.newIntent(getActivity(), mCrime.getId());
+            itemPosition = getAdapterPosition();
+            startActivity(intent);
         }
 
         private Crime mCrime;
@@ -81,6 +95,7 @@ public class CrimeListFragment extends Fragment {
     private class CrimeAdapter extends RecyclerView.Adapter<CrimeHolder> {
 
         private List<Crime> mCrimes;
+        private static final String CRIME_ID = "unique_crime_id";
 
         public CrimeAdapter(List<Crime> crimes) {
             mCrimes = crimes;
@@ -95,7 +110,7 @@ public class CrimeListFragment extends Fragment {
 
         @Override
         public int getItemViewType(int position) {
-            if (mCrimes.get(position).isSolved()) {
+            if (!mCrimes.get(position).isSolved()) {
                 return R.layout.list_item_crime_no_image;
             }
             else {
@@ -106,6 +121,7 @@ public class CrimeListFragment extends Fragment {
         @Override
         public void onBindViewHolder(CrimeHolder holder, int position) {
             Crime crime = mCrimes.get(position);
+            Log.i(CRIME_ID, crime.getId().toString());
             holder.bind(crime);
         }
 

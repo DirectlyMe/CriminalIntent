@@ -19,7 +19,6 @@ public class Crime {
         mId = UUID.randomUUID();
 
         mDate = new Date();
-
     }
 
     public String getTitle() {
