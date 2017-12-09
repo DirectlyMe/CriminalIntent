@@ -10,6 +10,8 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.Button;
 
 import java.util.List;
 import java.util.UUID;
@@ -63,5 +65,7 @@ public class CrimePagerActivity extends AppCompatActivity {
                 break;
             }
         }
+
+
     }
 }
