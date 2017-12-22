@@ -34,6 +34,8 @@ public class CrimeListFragment extends Fragment {
 
     private RecyclerView mCrimeRecyclerView;
     private CrimeAdapter mAdapter;
+    private Button mCreateItemButton;
+    private TextView mAddCrimeText;
     private boolean mSubtitleVisible;
 
     private int itemPosition;
@@ -49,17 +51,33 @@ public class CrimeListFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
         List crimes = CrimeLab.get(getActivity()).getCrimes();
-        if (crimes.size() == 0) {
 
+        View view = inflater.inflate(R.layout.fragment_crime_list, container, false);
+
+        mCrimeRecyclerView = view.findViewById(R.id.crime_recycler_view);
+
+        mCrimeRecyclerView.setLayoutManager(new LinearLayoutManager((getActivity())));
+
+        mCreateItemButton = (Button) view.findViewById(R.id.create_crime_button);
+        mCreateItemButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Crime crime = new Crime();
+                CrimeLab.get(getActivity()).addCrime(crime);
+                Intent intent = CrimePagerActivity.newIntent(getActivity(), crime.getId());
+                startActivity(intent);
+            }
+        });
+
+        mAddCrimeText = (TextView) view.findViewById(R.id.add_crime_textview);
+
+        if(crimes.size() == 0) {
+            mCreateItemButton.setVisibility(View.VISIBLE);
+            mAddCrimeText.setVisibility(View.VISIBLE);
         }
         else {
-
-            View view = inflater.inflate(R.layout.fragment_crime_list, container, false);
-
-            mCrimeRecyclerView = view.findViewById(R.id.crime_recycler_view);
-
-            mCrimeRecyclerView.setLayoutManager(new LinearLayoutManager((getActivity())));
-
+            mCreateItemButton.setVisibility(View.INVISIBLE);
+            mAddCrimeText.setVisibility(View.INVISIBLE);
         }
 
         if (savedInstanceState != null) {
@@ -145,11 +163,10 @@ public class CrimeListFragment extends Fragment {
         if (mAdapter == null) {
             mAdapter = new CrimeAdapter(crimes);
             mCrimeRecyclerView.setAdapter(mAdapter);
-            Log.v(UPDATED_LIST, "adapter was not notified");
         }
         else {
-            mAdapter.notifyItemChanged(itemPosition);
-            Log.v(UPDATED_LIST, "adapter exists and was notified.");
+            mAdapter.setCrimes(crimes);
+            mAdapter.notifyDataSetChanged();
         }
 
         updateSubtitle();
@@ -221,6 +238,10 @@ public class CrimeListFragment extends Fragment {
         @Override
         public int getItemCount() {
             return mCrimes.size();
+        }
+
+        public void setCrimes(List<Crime> crimes) {
+            mCrimes = crimes;
         }
     }
 
