@@ -1,18 +1,28 @@
 package com.bignerdranch.android.criminalintent;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.Picture;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.ShareCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.FileProvider;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -24,8 +34,12 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.text.format.DateFormat;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 
+import java.io.File;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -35,17 +49,28 @@ import java.util.UUID;
 public class CrimeFragment extends Fragment {
 
     private Crime mCrime;
+    private File mPhotoFile;
+
     private EditText mTitleField;
     private Button mDateButton;
     private CheckBox mSolvedCheckBox;
     private Button mReportButton;
     private Button mSuspectButton;
+    private Button mCallSuspect;
+    private ImageButton mPhotoButton;
+    private ImageView mPhotoView;
 
     private static final String ARG_CRIME_ID = "crime_id";
     private static final String DIALOG_DATE = "DialogDate";
+    private static final String CHECK_TELE_NUM = "Telephone Number";
+    private String mSuspectId;
+
 
     private static final int REQUEST_DATE = 0;
     private static final int REQUEST_CONTACT = 1;
+    private static final int GET_PERMISSION = 2;
+    private static final int REQUEST_PHOTO = 3;
+
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -55,6 +80,7 @@ public class CrimeFragment extends Fragment {
 
         UUID crimeId = (UUID) getArguments().getSerializable(ARG_CRIME_ID);
         mCrime = CrimeLab.get(getActivity()).getCrime(crimeId);
+        mPhotoFile = CrimeLab.get(getActivity()).getPhotoFile(mCrime);
 
     }
 
@@ -116,8 +142,27 @@ public class CrimeFragment extends Fragment {
         mSuspectButton = (Button) v.findViewById(R.id.crime_suspect);
         mSuspectButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                startActivityForResult(pickContact, REQUEST_CONTACT);
+                if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.READ_CONTACTS)
+                        != PackageManager.PERMISSION_GRANTED) {
 
+                    ActivityCompat.requestPermissions(getActivity(),
+                            new String[] {Manifest.permission.READ_CONTACTS},
+                            GET_PERMISSION);
+                }
+                startActivityForResult(pickContact, REQUEST_CONTACT);
+            }
+        });
+
+        mCallSuspect = (Button) v.findViewById(R.id.crime_call);
+        mCallSuspect.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Intent dialNumber = new Intent(Intent.ACTION_DIAL);
+
+                Uri number = Uri.parse("tel:" + mCrime.getPhone());
+
+                dialNumber.setData(number);
+
+                startActivity(dialNumber);
             }
         });
 
@@ -130,6 +175,36 @@ public class CrimeFragment extends Fragment {
                 packageManager.MATCH_DEFAULT_ONLY) == null) {
             mSuspectButton.setEnabled(false);
         }
+
+        mPhotoButton = (ImageButton) v.findViewById(R.id.crime_camera);
+        final Intent captureImage = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+
+        boolean canTakePhoto = mPhotoFile != null && captureImage.resolveActivity(packageManager)
+                != null;
+        mPhotoButton.setEnabled(canTakePhoto);
+
+        mPhotoButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Uri uri = FileProvider.getUriForFile(getActivity(),
+                        "com.bignerdranch.android.criminalintent.fileprovider",
+                        mPhotoFile);
+                captureImage.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+
+                List<ResolveInfo> cameraActivites = getActivity().getPackageManager()
+                        .queryIntentActivities(captureImage, PackageManager.MATCH_DEFAULT_ONLY);
+
+                for (ResolveInfo activity: cameraActivites) {
+                    getActivity().grantUriPermission(activity.activityInfo.packageName,
+                            uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                }
+
+                startActivityForResult(captureImage, REQUEST_PHOTO);
+            }
+        });
+
+        mPhotoView = (ImageView) v.findViewById(R.id.crime_photo);
+        updatePhotoView();
+
 
         return v;
     }
@@ -173,7 +248,7 @@ public class CrimeFragment extends Fragment {
         if (resultCode != Activity.RESULT_OK) {
             return;
         }
-        if (resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQUEST_DATE) {
             Date date = (Date) data.getSerializableExtra(DatePickerFragment.EXTRA_DATE);
 
             mCrime.setDate(date);
@@ -183,7 +258,8 @@ public class CrimeFragment extends Fragment {
             Uri contactUri = data.getData();
 
             String[] queryFields = new String[] {
-                    ContactsContract.Contacts.DISPLAY_NAME
+                    ContactsContract.Contacts.DISPLAY_NAME,
+                    ContactsContract.Contacts._ID
             };
 
             Cursor cursor = getActivity().getContentResolver()
@@ -196,17 +272,75 @@ public class CrimeFragment extends Fragment {
 
                 cursor.moveToFirst();
                 String suspect = cursor.getString(0);
+                mSuspectId = cursor.getString(1);
+                getSuspectNumber(mSuspectId);
                 mCrime.setSuspect(suspect);
                 mSuspectButton.setText(mCrime.getSuspect());
             }
             finally {
                 cursor.close();
             }
+
         }
+        else if (requestCode == REQUEST_PHOTO) {
+            Uri uri = FileProvider.getUriForFile(getActivity(),
+                    "com.bignerdranch.android.criminalintent.fileprovider",
+                    mPhotoFile);
+
+            getActivity().revokeUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+            updatePhotoView();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     private void updateDate() {
         mDateButton.setText(mCrime.getDate().toString());
+    }
+
+    private void updatePhotoView() {
+        if (mPhotoFile == null || !mPhotoFile.exists()) {
+            mPhotoView.setImageDrawable(null);
+        }
+        else {
+            Bitmap bitmap = PictureUtils.getScaledBitmap(mPhotoFile.getPath(), getActivity());
+            mPhotoView.setImageBitmap(bitmap);
+        }
+    }
+
+    private void getSuspectNumber(String contactId) {
+
+        Uri phoneContactUri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
+
+        String[] queryFields = new String[] {
+                ContactsContract.Data.CONTACT_ID,
+                ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ContactsContract.CommonDataKinds.Phone.TYPE
+        };
+
+        String SelectClause = ContactsContract.Data.CONTACT_ID + " = ?";
+
+        String[] whereArgs = {""};
+
+        whereArgs[0] = contactId;
+
+        Cursor cursor = getActivity().getContentResolver()
+                .query(phoneContactUri, queryFields, SelectClause, whereArgs, null);
+
+        try {
+            cursor.moveToFirst();
+
+           mCrime.setPhone(cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DATA)));
+
+           Log.v(CHECK_TELE_NUM, mCrime.getPhone());
+        }
+        finally {
+            cursor.close();
+        }
     }
 
     private String getCrimeReport() {
