@@ -11,7 +11,7 @@ import android.graphics.Point;
 
 public class PictureUtils {
 
-    public static Bitmap getScaledBitmap(String path, int destWidth, int destHeigth) {
+    public static Bitmap getScaledBitmap(String path, int destWidth, int destHeight) {
 
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
@@ -21,8 +21,8 @@ public class PictureUtils {
         float srcHeight = options.outHeight;
 
         int inSampleSize = 1;
-        if (srcHeight > destHeigth || srcWidth > destWidth) {
-            float heightScale = srcHeight / destHeigth;
+        if (srcHeight > destHeight || srcWidth > destWidth) {
+            float heightScale = srcHeight / destHeight;
             float widthScale = srcWidth / destWidth;
 
             inSampleSize = Math.round(heightScale > widthScale ? heightScale : widthScale);
